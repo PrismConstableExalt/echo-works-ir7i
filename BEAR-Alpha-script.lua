@@ -1,0 +1,826 @@
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/SoocusMoocus/AlphaGui/refs/heads/main/OrionLoader')))()
+
+local Window = OrionLib:MakeWindow({
+    Name = "Alpha Gui V11",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "AlphaGui"
+})
+
+local InfoTab = Window:MakeTab({
+    Name = "Info",
+    Icon = "rbxassetid://1",
+    PremiumOnly = false
+})
+
+local Section = InfoTab:AddSection({
+    Name = "Info"
+})
+
+local playerName = game.Players.LocalPlayer.Name
+
+InfoTab:AddButton({
+    Name = "Welcome " .. playerName .. "! This is best script for bear alpha!",
+    Callback = function()
+    end
+})
+
+InfoTab:AddButton({
+    Name = "Last Updated on 24.11",
+    Callback = function()
+    end
+})
+
+InfoTab:AddButton({
+    Name = "Discord Server click to copy",
+    Callback = function()
+        setclipboard("https://discord.gg/NpP2kJDm4X")
+    end    
+})
+
+-- Main Tab
+local MainTab = Window:MakeTab({
+    Name = "Main",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+-- Bear Tab
+local BearTab = Window:MakeTab({
+    Name = "Bear",
+    Icon = "rbxassetid://17868011535",
+    PremiumOnly = false
+})
+
+-- Survivor Tab
+local SurvivorTab = Window:MakeTab({
+    Name = "Survivor",
+    Icon = "rbxassetid://1249536826",
+    PremiumOnly = false
+})
+
+-- Badges Tab
+local BadgesTab = Window:MakeTab({
+    Name = "Badges",
+    Icon = "rbxassetid://24985816",
+    PremiumOnly = false
+})
+
+-- Event Tab
+local EventTab = Window:MakeTab({
+    Name = "Event",
+    Icon = "rbxassetid://24985816",
+    PremiumOnly = false
+})
+
+local PluginsTab = Window:MakeTab({
+    Name = "Plugins",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+MainTab:AddButton({
+    Name = "Infinite Yield",
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+    end    
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+
+local lplr = Players.LocalPlayer
+
+local targetPart = workspace.Lobby._Obby.Quidz
+local AFKRemote = ReplicatedStorage
+    :WaitForChild("_Remotes")
+    :WaitForChild("RE/AFK_Toggle")
+
+local teleportCFrame = CFrame.new(
+    407.588989, 52.5979233, -28.9725761,
+    -0.139009118, 6.21292671e-08, -0.990291119,
+    -1.54991433e-08, 1, 6.49140333e-08,
+    0.990291119, 2.43723051e-08, -0.139009118
+)
+
+local touchInterval = 1 / 60
+local lastTouchTime = 0
+
+local obbyEnabled = false
+local farmConnection = nil
+local farmCharacter = nil
+
+lplr.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new(0, 0))
+end)
+
+local function stopFarm()
+    if farmConnection then
+        farmConnection:Disconnect()
+        farmConnection = nil
+    end
+
+    farmCharacter = nil
+end
+
+local function startFarm(character)
+    stopFarm()
+
+    if not obbyEnabled then return end
+
+    local humanoid = character:WaitForChild("Humanoid")
+    local hrp = character:WaitForChild("HumanoidRootPart")
+
+    hrp.CFrame = teleportCFrame
+    farmCharacter = character
+
+    farmConnection = RunService.Heartbeat:Connect(function()
+        if not obbyEnabled or lplr.Character ~= character then
+            stopFarm()
+            return
+        end
+
+        if humanoid.Health <= 0 then
+            stopFarm()
+            return
+        end
+
+        hrp.CFrame = teleportCFrame
+
+        local now = os.clock()
+
+        if now - lastTouchTime >= touchInterval then
+            lastTouchTime = now
+
+            local touchPart =
+                character:FindFirstChild("LeftFoot")
+                or character:FindFirstChild("LeftLeg")
+                or hrp
+
+            if touchPart and targetPart then
+                firetouchinterest(targetPart, touchPart, 0)
+                task.wait()
+                firetouchinterest(targetPart, touchPart, 1)
+            end
+        end
+    end)
+end
+
+local function checkObby()
+    if not obbyEnabled then return end
+
+    if not lplr.Team or lplr.Team.Name ~= "Waiting" then
+        stopFarm()
+        return
+    end
+
+    local character = lplr.Character
+    if not character then return end
+
+    local afkLabel = character:FindFirstChild("_AFKLabel")
+
+    if not afkLabel then
+        stopFarm()
+        AFKRemote:FireServer(false)
+        return
+    end
+
+    if not afkLabel:IsA("BillboardGui") or not afkLabel.Enabled then
+        stopFarm()
+        return
+    end
+
+    if farmCharacter ~= character or not farmConnection then
+        startFarm(character)
+    end
+end
+
+MainTab:AddToggle({
+    Name = "Obby Auto Farm (SAFE)",
+    Default = false,
+
+    Callback = function(state)
+        obbyEnabled = state
+
+        if not state then
+            stopFarm()
+            return
+        end
+
+        task.spawn(function()
+            while obbyEnabled do
+                checkObby()
+                task.wait(0.5)
+            end
+
+            stopFarm()
+        end)
+    end
+})
+
+lplr.CharacterRemoving:Connect(function()
+    stopFarm()
+end)
+
+local Lighting = game:GetService("Lighting")
+local fullbrightConnection
+
+MainTab:AddToggle({
+    Name = "Auto Fullbright",
+    Default = false,
+    Callback = function(state)
+        if state then
+            Lighting.ClockTime = 14
+            Lighting.Brightness = 5
+
+            fullbrightConnection = Lighting:GetPropertyChangedSignal("ClockTime"):Connect(function()
+                Lighting.ClockTime = 14
+                Lighting.Brightness = 5
+                Lighting.FogEnd = 100000
+            end)
+        else
+            if fullbrightConnection then
+                fullbrightConnection:Disconnect()
+                fullbrightConnection = nil
+            end
+        end
+    end
+})
+
+BadgesTab:AddButton({
+    Name = "Afrocity Code",
+    Callback = function()
+LocalPlayer = game.GetService(game, 'Players').LocalPlayer
+
+Code = ''
+Random = Random.new(LocalPlayer.UserId + 59102)
+
+for Morse = 1, 8 do
+Code = Code .. tostring(Random:NextInteger(0,9)) end
+
+setclipboard(Code)
+    end    
+})
+
+-- Puzzle ESP
+local puzzleESPEnabled = false
+local puzzleESPObjects = {}
+-- Add ESP to a part
+local function addPuzzleESP(part, color)
+	if part:FindFirstChild("PuzzleESP") then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "PuzzleESP"
+	highlight.FillColor = color
+  highlight.OutlineTransparency = 1
+	highlight.Parent = part
+
+	table.insert(puzzleESPObjects, highlight)
+end
+
+-- Remove all puzzle ESP
+local function clearPuzzleESP()
+	for _, esp in pairs(puzzleESPObjects) do
+		if esp and esp.Parent then
+			esp:Destroy()
+		end
+	end
+	table.clear(puzzleESPObjects)
+end
+
+-- Apply ESP to puzzles
+local function applyPuzzleESP()
+	local Map = workspace:FindFirstChild("Map")
+	if not Map then return end
+
+	-- Color Code
+	local ColorCode = Map:FindFirstChild("ColorCode")
+	if ColorCode then
+		if ColorCode:FindFirstChild("Base") then
+			addPuzzleESP(ColorCode.Base, Color3.fromRGB(0, 255, 255))
+		end
+
+		local codePos = ColorCode:FindFirstChild("CodePositions")
+		if codePos and codePos:FindFirstChild("Clue") then
+			addPuzzleESP(codePos.Clue, Color3.fromRGB(0, 255, 255))
+codePos.Clue.Transparency = 0
+		end
+	end
+
+	-- Cheese Altar
+	local Altar = Map:FindFirstChild("CheeseAltar")
+	if Altar then
+		if Altar:FindFirstChild("Base") then
+			addPuzzleESP(Altar.Base, Color3.fromRGB(255, 170, 0))
+		end
+
+		local Items = Altar:FindFirstChild("Items")
+		if Items then
+			addPuzzleESP(Items.Item, Color3.fromRGB(255, 170, 0))
+		end
+	end
+
+	-- Wire Puzzle
+	for _, wire in pairs(Map:GetChildren()) do
+		if wire.Name == "Wire" then
+			addPuzzleESP(wire, Color3.fromRGB(255, 0, 0))
+		end
+	end
+end
+SurvivorTab:AddToggle({
+	Name = "Puzzle ESP",
+	Default = false,
+	Callback = function(state)
+		puzzleESPEnabled = state
+
+		if state then
+			task.spawn(function()
+				while puzzleESPEnabled do
+					applyPuzzleESP()
+					task.wait(1)
+				end
+			end)
+		else
+			clearPuzzleESP()
+		end
+	end
+})
+
+-- Variables for hitbox modification
+local hitboxSizeValue = 10
+local hitboxExpanded = false
+
+-- Function to modify hitboxes
+local function modifyHitboxes(expand)
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer and player.Character then
+            local root = player.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                if expand then
+                    root.Size = Vector3.new(
+                        hitboxSizeValue,
+                        hitboxSizeValue,
+                        hitboxSizeValue
+                    )
+                    root.Transparency = 0.5
+                    root.CanCollide = false
+                else
+                    root.Size = Vector3.new(2, 2, 1)
+                    root.Transparency = 0
+                end
+            end
+        end
+    end
+end
+
+BearTab:AddTextbox({
+    Name = "Hitbox Size (min 3)",
+    Default = tostring(hitboxSizeValue),
+    TextDisappear = false,
+    Callback = function(text)
+        local value = tonumber(text)
+
+        if not value then
+            OrionLib:MakeNotification({
+                Name = "Hitbox",
+                Content = "Please enter a number",
+                Time = 3
+            })
+            return
+        end
+
+        -- clamp to minimum 3
+        value = math.max(3, math.floor(value))
+        hitboxSizeValue = value
+
+        -- re-apply if already enabled
+        if hitboxExpanded then
+            modifyHitboxes(true)
+        end
+    end
+})
+
+BearTab:AddToggle({
+    Name = "Hitbox Expand",
+    Default = false,
+    Callback = function(state)
+        hitboxExpanded = state
+        modifyHitboxes(hitboxExpanded)
+    end
+})
+
+local autoColorCodeEnabled = false
+local solving = false
+
+SurvivorTab:AddToggle({
+	Name = "Auto Color Code Puzzle",
+	Default = false,
+	Callback = function(state)
+		autoColorCodeEnabled = state
+
+		if state then
+			OrionLib:MakeNotification({
+				Name = "Color Code Puzzle",
+				Content = "Starting puzzle solver...",
+				Image = "rbxassetid://4483345998",
+				Time = 3
+			})
+
+			task.spawn(function()
+				-- Wait for new structure
+				local Map = workspace:WaitForChild("Map")
+				local ColorCode = Map:WaitForChild("ColorCode")
+
+				local ButtonsFolder = ColorCode
+					:WaitForChild("Base")
+					:WaitForChild("Buttons")
+
+				local ClueFrame = ColorCode
+					:WaitForChild("CodePositions")
+					:WaitForChild("Clue")
+					:WaitForChild("Note")
+					:WaitForChild("Frame")
+
+				solving = true
+
+				while autoColorCodeEnabled and solving do
+					for i = 1, 4 do
+						if not autoColorCodeEnabled then break end
+
+						local button = ButtonsFolder:FindFirstChild(tostring(i))
+						local clue = ClueFrame:FindFirstChild(tostring(i))
+
+						if button and clue then
+							local buttonLabel =
+								button:FindFirstChild("Note")
+								and button.Note:FindFirstChild("Label")
+
+							local clickDetector = button:FindFirstChildOfClass("ClickDetector")
+
+							if buttonLabel and clickDetector then
+								while autoColorCodeEnabled and buttonLabel.Text ~= clue.Text do
+									fireclickdetector(clickDetector)
+									task.wait(0.2)
+								end
+							end
+						end
+					end
+					task.wait(0.5)
+				end
+				solving = false
+			end)
+		else
+			solving = false
+		end
+	end
+})
+
+-- Bear Tab: Bring Survivors Toggle
+local bringSurvivorsEnabled = false
+BearTab:AddToggle({
+    Name = "Bring Survivors",
+    Default = false,
+    Callback = function(state)
+        bringSurvivorsEnabled = state
+        if bringSurvivorsEnabled then
+            spawn(function()
+                while bringSurvivorsEnabled do
+                    for _, player in pairs(game.Players:GetPlayers()) do
+                        if player.Team and player.Team.Name == "Survivors" and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            local rootPart = game.Players.LocalPlayer.Character.Torso
+                            player.Character:SetPrimaryPartCFrame(rootPart.CFrame + Vector3.new(0, 5, 0))
+                        end
+                    end
+                    wait(0.5)
+                end
+            end)
+        end
+    end
+})
+
+-- Survivor Tab: Auto Wire PuzzleToggle
+local survivorAutoPuzzleEnabled = false
+SurvivorTab:AddToggle({
+    Name = "Auto Wire Puzzle",
+    Default = false,
+    Callback = function(state)
+        survivorAutoPuzzleEnabled = state
+        if survivorAutoPuzzleEnabled then
+            spawn(function()
+    while survivorAutoPuzzleEnabled do
+        local Map = workspace:FindFirstChild("Map")
+        if not Map then task.wait(1) continue end
+
+        for _, wireModel in ipairs(Map:GetChildren()) do
+            if not survivorAutoPuzzleEnabled then break end
+            if wireModel.Name ~= "Wire" then continue end
+
+            local wiresFolder = wireModel:FindFirstChild("Wires")
+            if not wiresFolder then continue end
+
+            for _, wirePart in ipairs(wiresFolder:GetChildren()) do
+                if not survivorAutoPuzzleEnabled then break end
+                if not wirePart:IsA("BasePart") then continue end
+
+                local clickDetector = wirePart:FindFirstChildOfClass("ClickDetector")
+                if not clickDetector then continue end
+
+                local startColor = wirePart.Color
+
+                -- Click until the wire changes color
+                local safety = 0
+                while survivorAutoPuzzleEnabled
+                    and wirePart.Parent
+                    and wirePart.Color == startColor
+                    and safety < 20 do
+
+                    fireclickdetector(clickDetector)
+                    safety += 1
+                    task.wait(0.15)
+                end
+            end
+        end
+
+        task.wait(0.5)
+    end
+end)
+        end
+    end
+})
+
+-- Main Tab: Toggle ESP
+local espEnabled = false
+
+MainTab:AddToggle({
+    Name = "Toggle ESP",
+    Default = false,
+    Callback = function(state)
+        espEnabled = state
+        
+        if espEnabled then
+            task.spawn(function()
+                while espEnabled do
+                    for _, p in pairs(game.Players:GetPlayers()) do
+                        if p ~= game.Players.LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+                            local char = p.Character
+                            local head = char.Head
+                            local humanoid = char:FindFirstChildOfClass("Humanoid")
+                            local box = char:FindFirstChild("ESPBox")
+                            if not box then
+                                box = Instance.new("BoxHandleAdornment")
+                                box.Name = "ESPBox"
+                                box.Adornee = char
+                                box.Size = Vector3.new(4, 6, 4)
+                                box.AlwaysOnTop = true
+                                box.ZIndex = 10
+                                box.Transparency = 0.5
+                                box.Parent = char
+                            end
+                            box.Color3 = p.TeamColor.Color
+                            local billboard = head:FindFirstChild("ESPNameTag")
+                            local label
+                            
+                            if not billboard then
+                                billboard = Instance.new("BillboardGui")
+                                billboard.Name = "ESPNameTag"
+                                billboard.Size = UDim2.new(0, 200, 0, 50)
+                                billboard.StudsOffset = Vector3.new(0, 3, 0)
+                                billboard.AlwaysOnTop = true
+                                billboard.Parent = head
+
+                                label = Instance.new("TextLabel")
+                                label.Name = "TagLabel"
+                                label.Size = UDim2.new(1, 0, 1, 0)
+                                label.BackgroundTransparency = 1
+                                label.TextScaled = true
+                                label.Font = Enum.Font.SourceSansBold
+                                label.TextColor3 = Color3.new(1, 1, 1)
+                                label.TextStrokeTransparency = 0 
+                                label.TextStrokeColor3 = Color3.new(0, 0, 0)
+                                label.Parent = billboard
+                            else
+                                label = billboard:FindFirstChild("TagLabel")
+                            end
+                            if label then
+                                local hp = humanoid and math.floor(humanoid.Health) or 0
+                                local team = p.Team and p.Team.Name or "NoTeam"
+                                label.Text = string.format("Name: %s (%s)\nHP: %d", p.Name, team, hp)
+                            end
+                        end
+                    end
+                    task.wait(1)
+                end
+            end)
+        else
+            for _, p in pairs(game.Players:GetPlayers()) do
+                if p.Character then
+                    if p.Character:FindFirstChild("ESPBox") then
+                        p.Character.ESPBox:Destroy()
+                    end
+                    if p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("ESPNameTag") then
+                        p.Character.Head.ESPNameTag:Destroy()
+                    end
+                end
+            end
+        end
+    end
+})
+
+local infStaminaEnabled = false
+
+SurvivorTab:AddToggle({
+    Name = "Infinite Stamina",
+    Default = false,
+    Callback = function(state)
+        infStaminaEnabled = state
+
+        if state then
+            task.spawn(function()
+                local sprintModule
+
+                for _, v in ipairs(getloadedmodules()) do
+                    local ok, mod = pcall(require, v)
+
+                    if ok and type(mod) == "table" then
+                        if rawget(mod, "Current")
+                        and rawget(mod, "SprintAction")
+                        and rawget(mod, "SprintStats") then
+                            sprintModule = mod
+                            break
+                        end
+                    end
+                end
+
+                if not sprintModule then
+                    return
+                end
+
+                while infStaminaEnabled do
+                    pcall(function()
+                        sprintModule.Current.Value =
+                            sprintModule.SprintStats.Stamina.Max
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+local QuidzTrackerEnabled = false
+local QuidzTrackerGui = nil
+
+MainTab:AddToggle({
+    Name = "Quidz Stats",
+    Default = false,
+    Callback = function(state)
+        QuidzTrackerEnabled = state
+
+        if state then
+            task.spawn(function()
+
+                local players = game:GetService("Players")
+                local lplr = players.LocalPlayer
+
+                local moneyLabel = lplr.PlayerGui.GameUI.LeftHandButtons.MoneyDisplay.Label
+
+                local function parseNumber(text)
+                    local cleaned = text:gsub("[^%d%.]", "")
+                    return tonumber(cleaned) or 0
+                end
+
+                local startMoney = parseNumber(moneyLabel.Text)
+                local startTime = os.time()
+
+                QuidzTrackerGui = Instance.new("ScreenGui")
+                QuidzTrackerGui.Name = "QuidzTrackerGui"
+                QuidzTrackerGui.ResetOnSpawn = false
+                QuidzTrackerGui.Parent = lplr.PlayerGui
+
+                local mainFrame = Instance.new("Frame")
+                mainFrame.Size = UDim2.new(0, 240, 0, 110)
+                mainFrame.Position = UDim2.new(0, 10, 0.4, 0)
+                mainFrame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+                mainFrame.BackgroundTransparency = 0.2
+                mainFrame.BorderSizePixel = 0
+                mainFrame.Parent = QuidzTrackerGui
+
+                Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,8)
+
+                local function createLabel(y, color, text)
+                    local label = Instance.new("TextLabel")
+                    label.Size = UDim2.new(1,-20,0,25)
+                    label.Position = UDim2.new(0,10,0,y)
+                    label.BackgroundTransparency = 1
+                    label.TextColor3 = color
+                    label.Font = Enum.Font.SourceSansBold
+                    label.TextSize = 17
+                    label.TextXAlignment = Enum.TextXAlignment.Left
+                    label.Text = text
+                    label.Parent = mainFrame
+                    return label
+                end
+
+                local timerLabel = createLabel(5, Color3.fromRGB(255,255,255), "Timer: 00:00:00")
+                local earnedLabel = createLabel(35, Color3.fromRGB(85,255,127), "Earned: 0")
+                local speedLabel = createLabel(65, Color3.fromRGB(255,212,42), "Speed: 0/sec")
+
+                local function formatTime(seconds)
+                    local h = math.floor(seconds / 3600)
+                    local m = math.floor((seconds % 3600) / 60)
+                    local s = math.floor(seconds % 60)
+                    return string.format("%02d:%02d:%02d", h, m, s)
+                end
+
+                while QuidzTrackerEnabled and QuidzTrackerGui and QuidzTrackerGui.Parent do
+                    local elapsedTime = math.max(os.time() - startTime, 1)
+
+                    local currentMoney = parseNumber(moneyLabel.Text)
+                    local totalEarned = currentMoney - startMoney
+
+                    if totalEarned < 0 then
+                        startMoney = currentMoney
+                        totalEarned = 0
+                    end
+
+                    local perSecond = totalEarned / elapsedTime
+
+                    timerLabel.Text = "Timer: "..formatTime(elapsedTime)
+                    earnedLabel.Text = "Earned: "..math.floor(totalEarned)
+                    speedLabel.Text = string.format("Speed: %.1f/sec", perSecond)
+
+                    task.wait(0.1)
+                end
+            end)
+        else
+            if QuidzTrackerGui then
+                QuidzTrackerGui:Destroy()
+                QuidzTrackerGui = nil
+            end
+        end
+    end
+})
+
+local eventTouchEnabled = false
+local eventConnection = nil
+
+local function touchEventPart(modelName)
+    local Workspace = game:GetService("Workspace")
+    local model = Workspace:FindFirstChild(modelName)
+    
+    if model then
+        local detectPart = model:FindFirstChild("Detect")
+        local character = game.Players.LocalPlayer.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        
+        if rootPart and detectPart and detectPart:IsA("BasePart") then
+            firetouchinterest(rootPart, detectPart, 0)
+            firetouchinterest(rootPart, detectPart, 1)
+        end
+    end
+end
+
+PluginsTab:AddButton({
+    Name = "For info go to our discord in info",
+    Callback = function()
+    end
+})
+local PluginsFolder = "AlphaGui"
+
+local function LoadPlugins()
+    for _, file in ipairs(listfiles(PluginsFolder)) do
+        if file:match("%.lua$") then
+            local ok, mod = pcall(function()
+                return loadstring(readfile(file))()
+            end)
+
+            if ok and type(mod) == "table" then
+                if mod.Type == "Toggle" then
+                    PluginsTab:AddToggle({
+                        Name = mod.Name or "Unknown",
+                        Default = mod.Default or false,
+                        Callback = function(state)
+                            pcall(mod.Callback, state)
+                        end
+                    })
+
+                elseif mod.Type == "Button" then
+                    PluginsTab:AddButton({
+                        Name = mod.Name or "Unknown",
+                        Callback = function()
+                            pcall(mod.Callback)
+                        end
+                    })
+                end
+            else
+                warn("Failed to load mod:", file)
+            end
+        end
+    end
+end
+
+LoadPlugins()
+OrionLib:Init()
